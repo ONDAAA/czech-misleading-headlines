@@ -62,6 +62,12 @@ Pozorování:
 - Spojený korpus obsahuje `225 288` titulků.
 - Z něj bylo ručně vybráno `400` kandidátů pro anotaci.
 
+Přímé odkazy:
+- celý spojený korpus: [`data/raw/merged/merged.csv`](data/raw/merged/merged.csv)
+- finální použitý dataset: [`data/used_sources_urls/final_dataset.csv`](data/used_sources_urls/final_dataset.csv)
+- výběr 400 kandidátů pro anotaci: [`data/used_sources_urls/selected_400.csv`](data/used_sources_urls/selected_400.csv)
+- ukázkový scraper: [`data/raw/scrapers/ct24/scraper_ct24_sitemap.py`](data/raw/scrapers/ct24/scraper_ct24_sitemap.py)
+
 ### Anotace
 
 - Anotace probíhala v Label Studiu podle vlastního schématu.
@@ -178,6 +184,76 @@ Typické prostředí:
 - Google Colab Pro
 - GPU NVIDIA L4
 - Hugging Face token v Colab Secrets
+
+Ukázka hlavní trénovací logiky:
+
+```python
+from unsloth import FastLanguageModel
+from transformers import Trainer, TrainingArguments, DataCollatorForLanguageModeling
+
+MAX_SEQ_LENGTH = 1024
+
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name="meta-llama/Meta-Llama-3.1-8B",
+    max_seq_length=MAX_SEQ_LENGTH,
+    dtype=None,
+    load_in_4bit=True,
+    token=hf_token,
+)
+
+def tokenize_function(examples):
+    tokenized = tokenizer(
+        examples["text"],
+        truncation=True,
+        max_length=MAX_SEQ_LENGTH,
+        padding="max_length",
+    )
+    tokenized["labels"] = tokenized["input_ids"].copy()
+    return tokenized
+
+train_tokenized = train_dataset.map(
+    tokenize_function,
+    batched=True,
+    remove_columns=train_dataset.column_names,
+)
+val_tokenized = val_dataset.map(
+    tokenize_function,
+    batched=True,
+    remove_columns=val_dataset.column_names,
+)
+
+training_args = TrainingArguments(
+    per_device_train_batch_size=2,
+    gradient_accumulation_steps=4,
+    num_train_epochs=3,
+    learning_rate=2e-4,
+    bf16=True,
+    optim="adamw_8bit",
+    lr_scheduler_type="cosine",
+    seed=42,
+    output_dir="checkpoints/llama_base_qlora_v1",
+    eval_strategy="steps",
+    eval_steps=20,
+    save_strategy="epoch",
+    save_total_limit=2,
+)
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_tokenized,
+    eval_dataset=val_tokenized,
+    data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
+)
+
+trainer.train()
+```
+
+Použití v projektu:
+- base model training: [`notebooks/finetune/01_finetune_llama_base.ipynb`](notebooks/finetune/01_finetune_llama_base.ipynb)
+- instruct model training: [`notebooks/finetune/02_finetune_llama_instruct.ipynb`](notebooks/finetune/02_finetune_llama_instruct.ipynb)
+- vstupní train split: [`data/processed/splits/jsonl/instruction/train_instruction.jsonl`](data/processed/splits/jsonl/instruction/train_instruction.jsonl)
+- validační split: [`data/processed/splits/jsonl/instruction/val_instruction.jsonl`](data/processed/splits/jsonl/instruction/val_instruction.jsonl)
 
 ### Inference
 
