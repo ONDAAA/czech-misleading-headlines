@@ -412,6 +412,9 @@ Výstupem jsou:
 - Transformers
 - PEFT
 - Unsloth
+- Hugging Face Hub
+- LLaMA 3.1
+- Weights & Biases
 - Label Studio
 - Google Colab Pro
 
