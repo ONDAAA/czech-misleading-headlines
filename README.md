@@ -1,86 +1,224 @@
 # Detekce zavádějícnosti českých zpravodajských titulků
 
-Bakalářská práce — FAI UTB Zlín, 2026.
+Bakalářská práce, FAI UTB ve Zlíně, 2026.
 
-**Téma:** Trénování a kvalitativní analýza lokálních jazykových modelů s využitím vlastní datové sady.
+Projekt se zabývá automatickou detekcí zavádějícnosti v českých zpravodajských titulcích pomocí lokálních jazykových modelů, fine-tuningu metodou QLoRA a srovnání s komerčním baseline modelem GPT-5.5.
 
-## Abstrakt
+## O projektu
 
-Tato práce se zabývá detekcí zavádějícnosti v krátkých českých zpravodajských sděleních (titulcích) pomocí lokálního jazykového modelu LLaMA 3.1 8B doladěného metodou QLoRA na vlastním anotovaném datasetu (n = 400 záznamů). Práce porovnává výkon fine-tunovaných modelů s zero-shot inferencí (base i Instruct varianta) a komerčním modelem GPT-5.5 jako horní mezí.
+Hlavní výzkumná otázka byla, zda lze na malé vlastní anotované sadě doladit lokální model tak, aby se přiblížil výkonu silného komerčního modelu při hodnocení zavádějících titulků.
 
-## Klíčové výsledky
+Repozitář obsahuje:
+- vlastní anotační schéma a anotační pravidla
+- datasety a jejich zpracování
+- notebooky pro fine-tuning a inferenci
+- evaluační skripty a finální výstupy
+- konfigurační soubory použitých LoRA adapterů
 
-| Konfigurace | F1 macro | Accuracy | Cohen κ |
-|---|---|---|---|
-| LLaMA 3.1 8B base (zero-shot) | 0.361 | 48.7% | 0.134 |
-| LLaMA 3.1 8B base + QLoRA | 0.700 | 71.3% | 0.573 |
-| LLaMA 3.1 8B Instruct (zero-shot) | 0.752 | 76.2% | 0.628 |
-| LLaMA 3.1 8B Instruct + QLoRA | 0.666 | 67.5% | 0.513 |
-| GPT-5.5 (zero-shot) | 0.767 | 77.5% | 0.662 |
+## Hlavní výsledky
+
+V této README jsou jako hlavní prezentovány výsledky varianty `short prompt`, protože to byla hlavní experimentální varianta použitá v bakalářské práci. Varianta `long prompt` je uvedena níže jako doplňkové srovnání.
+
+### Short Prompt
+
+Hlavní pole práce je `E1-misleading_header_model_final`, tedy finální třída zavádějícnosti. Následující tabulka shrnuje výsledky na testovací sadě 80 titulků.
+
+| Konfigurace | Parsing | E1 F1 macro | Accuracy | Cohen's kappa |
+|---|---:|---:|---:|---:|
+| LLaMA 3.1 8B base (zero-shot) | 100.0% | 0.240 | 43.8% | 0.027 |
+| LLaMA 3.1 8B base + QLoRA | 100.0% | 0.800 | 81.2% | 0.715 |
+| LLaMA 3.1 8B Instruct (zero-shot) | 98.8% | 0.377 | 49.4% | 0.149 |
+| LLaMA 3.1 8B Instruct + QLoRA | 100.0% | 0.722 | 75.0% | 0.609 |
+| GPT-5.5 (zero-shot) | 100.0% | 0.864 | 86.3% | 0.785 |
 
 Hlavní zjištění:
-- Fine-tuning přinesl dramatické zlepšení slabšího výchozího modelu (+0.34 F1).
-- Fine-tuning silnějšího Instruct modelu vedl k mírné degradaci (-0.09 F1).
-- Lokální model dosahuje 98 % výkonu komerčního SOTA při nulových cenových nákladech.
-- Inter-annotator agreement: Cohen's kappa = 0.80 (téměř dokonalá shoda).
+- Nejlepší lokální konfigurace v hlavní variantě byla `LLaMA 3.1 8B base + QLoRA` s `F1 macro = 0.800`.
+- Fine-tuning dramaticky pomohl base modelu: z `0.240` na `0.800` F1 macro.
+- Fine-tuning pomohl i Instruct variantě, ale méně výrazně: z `0.377` na `0.722`.
+- GPT-5.5 zůstal nejsilnějším baseline modelem, ale nejlepší lokální model se mu výrazně přiblížil.
 
-## Struktura projektu
+### Long Prompt
 
-```
+Pro úplnost repozitář obsahuje i výsledky varianty `long prompt`, která používala podrobnější instrukční prompt s kompletním popisem schématu.
+
+| Konfigurace | Parsing | E1 F1 macro | Accuracy | Cohen's kappa |
+|---|---:|---:|---:|---:|
+| LLaMA 3.1 8B base (zero-shot) | 100.0% | 0.361 | 48.7% | 0.134 |
+| LLaMA 3.1 8B base + QLoRA | 100.0% | 0.700 | 71.3% | 0.573 |
+| LLaMA 3.1 8B Instruct (zero-shot) | 100.0% | 0.752 | 76.2% | 0.628 |
+| LLaMA 3.1 8B Instruct + QLoRA | 100.0% | 0.666 | 67.5% | 0.513 |
+| GPT-5.5 (zero-shot) | 100.0% | 0.767 | 77.5% | 0.662 |
+
+Pozorování:
+- `long prompt` vyhovoval výrazně více zero-shot `Instruct` variantě než `short prompt`.
+- `short prompt` naopak lépe fungoval pro `base + QLoRA` i pro GPT-5.5.
+- Výsledky tedy nejsou jen o modelu, ale i o interakci mezi typem modelu a typem promptu.
+
+## Dataset a metodika
+
+### Sběr dat
+
+- Zdrojový korpus vznikl scrapingem 10 českých zpravodajských zdrojů.
+- Spojený korpus obsahuje `225 288` titulků.
+- Z něj bylo ručně vybráno `400` kandidátů pro anotaci.
+
+### Anotace
+
+- Anotace probíhala v Label Studiu podle vlastního schématu.
+- Hlavní cílová proměnná je `E1-misleading_header_model_final` se třídami:
+  - `NOT_MISLEADING`
+  - `POTENTIALLY_MISLEADING`
+  - `MISLEADING`
+- Dále se anotovaly dílčí signály jako chybějící kontext, framing, riziko misinterpretace nebo konspirační vzorce.
+
+### Split dat
+
+Po vyčištění a filtraci vzniklo `398` validních záznamů, které byly rozděleny stratifikovaně:
+
+| Split | Velikost |
+|---|---:|
+| Train | 278 |
+| Validation | 40 |
+| Test | 80 |
+
+### Inter-annotator agreement
+
+Sekce `data/iaa/` obsahuje experiment s druhým anotátorem. V práci vychází Cohenovo kappa přibližně na `0.80`, což odpovídá velmi vysoké shodě.
+
+### Modely
+
+Použité modely:
+- LLaMA 3.1 8B Base
+- LLaMA 3.1 8B Instruct
+- GPT-5.5 jako komerční baseline
+
+Fine-tuning:
+- metoda `QLoRA`
+- 4-bit kvantizace
+- LoRA `rank = 16`
+- `alpha = 32`
+- 3 epochy
+
+## Prompt varianty
+
+Repozitář obsahuje dvě promptovací strategie:
+
+- `prompts/system_prompt_v1.txt`
+  Dlouhá explicitní instrukce s detailním popisem celého anotačního schématu, rozhodovacích pravidel a definic jednotlivých polí.
+- `prompts/system_prompt_v2_short.txt`
+  Kratší produkční varianta se stručnějším zadáním a výčtem povolených hodnot.
+
+Související notebooky:
+- `notebooks/inference/long/`
+- `notebooks/inference/short/`
+
+## Struktura repozitáře
+
+```text
 bp-misleading-cs/
 ├── README.md
 ├── requirements.txt
-├── annotation_guidelines/    ← Anotační pravidla
-├── data/                     ← Raw, processed a IAA data
-├── docs/                     ← Workflow a doprovodná dokumentace
-├── label_studio/             ← XML konfigurace pro Label Studio
+├── annotation_guidelines/    # Anotační příručka
+├── data/
+│   ├── raw/                  # Surová data a scrapery
+│   ├── processed/            # Gold dataset a splity
+│   ├── iaa/                  # Inter-annotator agreement
+│   └── used_sources_urls/    # Exporty zdrojových URL a finální výběry
+├── docs/                     # Workflow a doprovodná dokumentace
+├── label_studio/             # XML konfigurace Label Studia
 ├── notebooks/
-│   ├── finetune/             ← Colab notebooky pro QLoRA
-│   └── inference/            ← Short/long prompt inference notebooky
-├── prompts/                  ← Použité systémové prompty
-├── scripts/                  ← Lokální utility a evaluace
-├── models/                   ← LoRA adaptery a checkpointy
-└── outputs/                  ← Predikce a evaluační výstupy
+│   ├── finetune/
+│   └── inference/
+│       ├── short/
+│       └── long/
+├── prompts/                  # Použité systémové prompty
+├── scripts/                  # Utility skripty
+├── models/                   # Konfigurace adapterů a tokenizerů
+└── outputs/                  # Predikce, reporty, grafy a confusion matrices
 ```
 
-Poznámka: kvůli GitHub file-size limitům nejsou v repozitáři verzované velké `.safetensors` soubory a checkpointy v `models/`.
+## Kde co hledat
 
-## Reprodukce experimentu
+- Hlavní workflow: `docs/workflow.md`
+- Anotační pravidla: `annotation_guidelines/annotation_guidelines.md`
+- Label Studio konfigurace: `label_studio/label_studio_config_used.xml`
+- Short prompt výsledky: `outputs/eval_outputs/short/`
+- Long prompt výsledky: `outputs/eval_outputs/full/`
+- Kombinované srovnání: `outputs/eval_outputs/combined/`
 
-Detailní krok-za-krokem návod je v [`docs/workflow.md`](docs/workflow.md).
+## Reprodukce
 
-Stručně:
+### Lokální příprava
 
 ```bash
-# 1. Vytvořit virtual environment
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+```
 
-# 2. Vytvořit data splity (lokálně)
+### Split datasetu
+
+```bash
 python data/processed/dataset_split.py
+```
 
-# 3. Spočítat IAA (lokálně)
+### Inter-annotator agreement
+
+```bash
 python data/iaa/iaa_evaluation.py
+```
 
-# 4. Fine-tuning (Colab — notebooky 01, 02)
+### Fine-tuning
 
-# 5. Inference (Colab — notebooky 03, 04)
+Notebooky:
+- `notebooks/finetune/01_finetune_llama_base.ipynb`
+- `notebooks/finetune/02_finetune_llama_instruct.ipynb`
 
-# 6. Stáhnout predikce z Drive lokálně do outputs/predictions_short/ a outputs/predictions_long/
+Typické prostředí:
+- Google Colab Pro
+- GPU NVIDIA L4
+- Hugging Face token v Colab Secrets
 
-# 7. Evaluace (lokálně)
+### Inference
+
+Short prompt:
+- `notebooks/inference/short/03_inference_llama_short.ipynb`
+- `notebooks/inference/short/04_inference_gpt_short.ipynb`
+
+Long prompt:
+- `notebooks/inference/long/03_inference_llama_long.ipynb`
+- `notebooks/inference/long/04_inference_gpt_long.ipynb`
+
+### Evaluace
+
+```bash
 python outputs/04_evaluation.py
 ```
 
+Výstupem jsou:
+- CSV reporty
+- Markdown reporty
+- confusion matrices
+- PNG a PDF grafy
+
+## Důležité poznámky
+
+- Velké trénovací artefakty jako `.safetensors` váhy a checkpointy nejsou ve veřejném repozitáři verzované kvůli GitHub file-size limitům.
+- V repozitáři zůstávají konfigurační soubory adapterů, tokenizerů, notebooky, datasety a evaluační výstupy.
+- Soubor `data/raw/merged/merged.csv` má přibližně 56 MB, takže GitHub u něj zobrazuje upozornění na větší velikost, ale repozitář jej stále přijímá.
+- Notebooky pro GPT inferenci očekávají `OPENAI_API_KEY` v Colab Secrets.
+- Notebooky pro LLaMA očekávají Hugging Face token s přístupem k `meta-llama/Meta-Llama-3.1-8B`.
+
 ## Použité technologie
 
-- **Modely:** LLaMA 3.1 8B (base + Instruct), GPT-5.5
-- **Fine-tuning:** QLoRA (4-bit kvantizace + LoRA adapter)
-- **Frameworks:** Unsloth, PEFT, Transformers, scikit-learn
-- **Anotace:** Label Studio
-- **Cloud:** Google Colab Pro (NVIDIA L4 GPU)
-- **Lokální:** Apple M1 (16 GB RAM)
+- Python
+- pandas
+- scikit-learn
+- Transformers
+- PEFT
+- Unsloth
+- Label Studio
+- Google Colab Pro
 
 ## Citace
 
@@ -89,7 +227,7 @@ Pokud používáte tuto práci, prosím citujte:
 ```bibtex
 @thesis{zemanek2026misleading,
   author = {Zemánek, Ondřej},
-  title  = {Trénování a kvalitativní analýza lokálních jazykových modelů 
+  title  = {Trénování a kvalitativní analýza lokálních jazykových modelů
             s využitím vlastní datové sady},
   school = {Univerzita Tomáše Bati ve Zlíně, Fakulta aplikované informatiky},
   year   = {2026},
