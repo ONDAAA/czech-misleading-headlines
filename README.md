@@ -8,7 +8,8 @@ Projekt se zabývá automatickou detekcí zavádějícnosti v českých zpravoda
 
 This repository contains a bachelor's thesis project focused on detecting misleading Czech news headlines with local language models. It includes the annotated dataset pipeline, prompt variants, fine-tuning notebooks, evaluation scripts, final reports, and two final QLoRA adapters published via Git LFS. The main thesis results are based on the `short prompt` setting, where `LLaMA 3.1 8B base + QLoRA` reached `0.800` F1 macro on the main misleadingness label, while `GPT-5.5` reached `0.864`.
 
-## O projektu
+<a id="overview"></a>
+## Přehled projektu
 
 Hlavní výzkumná otázka byla, zda lze na malé vlastní anotované sadě doladit lokální model tak, aby se přiblížil výkonu silného komerčního modelu při hodnocení zavádějících titulků.
 
@@ -19,32 +20,34 @@ Repozitář obsahuje:
 - evaluační skripty a finální výstupy
 - konfigurační soubory použitých LoRA adapterů
 
-## Use Cases
+<a id="use-cases"></a>
+## Možnosti využití
 
-Z tohohle repozitáře si může někdo vzít hlavně:
+Repozitář může sloužit jako základ nebo reference zejména pro následující scénáře:
 
-- ukázku malé výzkumné pipeline od scrapingu přes anotaci až po evaluaci
-- příklad vlastního label schema pro hodnocení zavádějících titulků
-- srovnání vlivu `short` a `long` promptu na klasifikační výkon
-- ukázku QLoRA fine-tuningu malého specializovaného datasetu
-- hotové finální adaptery, které lze použít jako základ pro další experimenty
-- evaluační výstupy a grafy jako referenci pro podobný výzkumný projekt
+- Replikace malé výzkumné pipeline od scrapingu přes anotaci až po evaluaci. Viz [Přehled projektu](#overview), [Dataset a metodika](#dataset), [Reprodukce](#reproduction).
+- Návrh vlastního anotačního schématu pro hodnocení zavádějících titulků. Viz [Anotační schéma a metadata](#annotation-schema), [`annotation_guidelines/annotation_guidelines.md`](annotation_guidelines/annotation_guidelines.md), [`label_studio/label_studio_config_used.xml`](label_studio/label_studio_config_used.xml).
+- Práce s datasety a metadaty, která lze dále analyzovat nebo rozšířit. Viz [Dataset a metodika](#dataset), [`data/raw/merged/merged.csv`](data/raw/merged/merged.csv), [`data/used_sources_urls/final_dataset.csv`](data/used_sources_urls/final_dataset.csv), [`data/raw/shuffler/label_studio_shuffled.csv`](data/raw/shuffler/label_studio_shuffled.csv).
+- Srovnání vlivu `short` a `long` promptu na klasifikační výkon. Viz [Hlavní výsledky](#results), [`prompts/system_prompt_v1.txt`](prompts/system_prompt_v1.txt), [`prompts/system_prompt_v2_short.txt`](prompts/system_prompt_v2_short.txt).
+- Ukázka QLoRA fine-tuningu nad malým specializovaným datasetem. Viz [Fine-tuning](#training), [`notebooks/finetune/01_finetune_llama_base.ipynb`](notebooks/finetune/01_finetune_llama_base.ipynb), [`notebooks/finetune/02_finetune_llama_instruct.ipynb`](notebooks/finetune/02_finetune_llama_instruct.ipynb).
+- Využití finálních adapterů, evaluačních reportů a grafů jako referenčních artefaktů pro další experimenty. Viz [Hlavní výsledky](#results), [`outputs/eval_outputs/short/`](outputs/eval_outputs/short/), [`outputs/eval_outputs/combined/`](outputs/eval_outputs/combined/), [`models/llama_base_qlora_v1/adapter_model.safetensors`](models/llama_base_qlora_v1/adapter_model.safetensors), [`models/llama_instruct_qlora_v1/adapter_model.safetensors`](models/llama_instruct_qlora_v1/adapter_model.safetensors).
 
-## Quick Start
+<a id="getting-started"></a>
+## Začínáme
 
-Nejjednodušší lineární postup pro někoho, kdo si chce repozitář jen stáhnout, projít a použít:
+Doporučený postup pro čtení, použití nebo rozšíření repozitáře:
 
-1. Forkni repozitář na GitHubu nebo si ho rovnou naklonuj.
-2. Pokud chceš i finální adaptery, nainstaluj `git lfs`.
-3. Naklonuj repozitář a stáhni LFS soubory.
-4. Vytvoř virtuální prostředí a nainstaluj závislosti.
-5. Otevři `README`, `docs/workflow.md` a `outputs/eval_outputs/short/eval_report.md`.
-6. Prohlédni si datasetové soubory a hotové výstupy.
-7. Pokud chceš reprodukovat pipeline, pokračuj přes split, inference nebo fine-tuning.
+1. Pokud chcete repozitář pouze použít nebo číst, stačí `clone`.
+2. Pokud na něm chcete stavět dál, vytvořte si nejprve `fork` a klonujte vlastní kopii.
+3. Pokud chcete pracovat i s finálními adaptery, aktivujte `git lfs` a stáhněte LFS objekty.
+4. Připravte si Python prostředí a nainstalujte závislosti.
+5. Začněte čtením hlavních výsledků a workflow dokumentace.
+6. Pokud chcete pokračovat vlastním experimentem, vytvořte si samostatnou branch.
 
 ```bash
+# varianta A: přímé použití repozitáře
 git clone https://github.com/ONDAAA/czech-misleading-headlines.git
-cd bp-misleading-cs
+cd czech-misleading-headlines
 
 git lfs install
 git lfs pull
@@ -52,39 +55,25 @@ git lfs pull
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-```
 
-Co otevřít jako první:
-- výsledky hlavní varianty: [`outputs/eval_outputs/short/eval_report.md`](outputs/eval_outputs/short/eval_report.md)
-- detail workflow: [`docs/workflow.md`](docs/workflow.md)
-- finální dataset: [`data/used_sources_urls/final_dataset.csv`](data/used_sources_urls/final_dataset.csv)
-- finální adaptery:
-  - [`models/llama_base_qlora_v1/adapter_model.safetensors`](models/llama_base_qlora_v1/adapter_model.safetensors)
-  - [`models/llama_instruct_qlora_v1/adapter_model.safetensors`](models/llama_instruct_qlora_v1/adapter_model.safetensors)
-
-## Fork Workflow
-
-Pokud si chce někdo projekt forknout a dál ho rozšiřovat, nejpraktičtější postup je:
-
-1. Forknout repozitář přes GitHub UI.
-2. Naklonovat vlastní fork.
-3. Zapnout `git lfs`, aby se stáhly adaptery.
-4. Vytvořit si vlastní branch pro experiment.
-5. Podle potřeby upravovat:
-   - datasety v `data/`
-   - prompty v `prompts/`
-   - fine-tuning notebooky v `notebooks/finetune/`
-   - inference notebooky v `notebooks/inference/`
-   - evaluaci v `outputs/04_evaluation.py`
-
-```bash
+# varianta B: fork a vlastní experiment
 git clone https://github.com/<your-username>/czech-misleading-headlines.git
-cd bp-misleading-cs
+cd czech-misleading-headlines
 git lfs install
 git lfs pull
 git checkout -b experiment/my-change
 ```
 
+Doporučené pořadí čtení:
+- hlavní výsledky: [`outputs/eval_outputs/short/eval_report.md`](outputs/eval_outputs/short/eval_report.md)
+- detailní workflow: [`docs/workflow.md`](docs/workflow.md)
+- finální dataset: [`data/used_sources_urls/final_dataset.csv`](data/used_sources_urls/final_dataset.csv)
+- vstupní metadata pro anotaci: [`data/raw/shuffler/label_studio_shuffled.csv`](data/raw/shuffler/label_studio_shuffled.csv)
+- finální adaptery:
+  - [`models/llama_base_qlora_v1/adapter_model.safetensors`](models/llama_base_qlora_v1/adapter_model.safetensors)
+  - [`models/llama_instruct_qlora_v1/adapter_model.safetensors`](models/llama_instruct_qlora_v1/adapter_model.safetensors)
+
+<a id="results"></a>
 ## Hlavní výsledky
 
 V této README jsou jako hlavní prezentovány výsledky varianty `short prompt`, protože to byla hlavní experimentální varianta použitá v bakalářské práci. Varianta `long prompt` je uvedena níže jako doplňkové srovnání.
@@ -124,6 +113,7 @@ Pozorování:
 - `short prompt` naopak lépe fungoval pro `base + QLoRA` i pro GPT-5.5.
 - Výsledky tedy nejsou jen o modelu, ale i o interakci mezi typem modelu a typem promptu.
 
+<a id="limits"></a>
 ## Known Limitations
 
 - Dataset je relativně malý, takže výsledky je potřeba číst jako experimentální a ne jako definitivní benchmark pro celý český mediální prostor.
@@ -133,6 +123,7 @@ Pozorování:
 - Výkon na této sadě negarantuje stejný výkon na jiných médiích, jiných časových obdobích nebo jiných typech titulků.
 - Finální adaptery jsou zveřejněné, ale checkpointy a kompletní trénovací artefakty v repozitáři nejsou.
 
+<a id="dataset"></a>
 ## Dataset a metodika
 
 ### Sběr dat
@@ -147,7 +138,21 @@ Přímé odkazy:
 - výběr 400 kandidátů pro anotaci: [`data/used_sources_urls/selected_400.csv`](data/used_sources_urls/selected_400.csv)
 - ukázkový scraper: [`data/raw/scrapers/ct24/scraper_ct24_sitemap.py`](data/raw/scrapers/ct24/scraper_ct24_sitemap.py)
 
-### Anotace
+Ukázka vstupního CSV s metadaty pro anotaci:
+
+```csv
+id,url,source,published,pre-label,header
+cnnprima_34868a07,https://cnn.iprima.cz/.../468115,CNNPrima,2025-03-09,P,Schmarcz: Na Ukrajině pomáháme sami sobě. Nejen Slovensko by se mohlo ocitnout v ohrožení
+novinky_ce1d6174,https://www.novinky.cz/.../40517636,Novinky,2025-04-22,P,Zlato díky Trumpovi zdražilo už na 3500 dolarů
+```
+
+Tento typ metadat je dostupný zejména v:
+- [`data/raw/shuffler/label_studio_shuffled.csv`](data/raw/shuffler/label_studio_shuffled.csv)
+- [`data/used_sources_urls/final_dataset.csv`](data/used_sources_urls/final_dataset.csv)
+- [`data/used_sources_urls/selected_400.csv`](data/used_sources_urls/selected_400.csv)
+
+<a id="annotation-schema"></a>
+### Anotační schéma a metadata
 
 - Anotace probíhala v Label Studiu podle vlastního schématu.
 - Hlavní cílová proměnná je `E1-misleading_header_model_final` se třídami:
@@ -155,6 +160,38 @@ Přímé odkazy:
   - `POTENTIALLY_MISLEADING`
   - `MISLEADING`
 - Dále se anotovaly dílčí signály jako chybějící kontext, framing, riziko misinterpretace nebo konspirační vzorce.
+
+Použité anotační schéma je definováno v:
+- [`label_studio/label_studio_config_used.xml`](label_studio/label_studio_config_used.xml)
+- [`annotation_guidelines/annotation_guidelines.md`](annotation_guidelines/annotation_guidelines.md)
+
+Ukázka části XML konfigurace:
+
+```xml
+<Choices name="A1-scope_of_missing_context" toName="header" required="true" choice="single">
+  <Choice value="NONE"/>
+  <Choice value="LOW"/>
+  <Choice value="HIGH"/>
+</Choices>
+
+<Choices name="B1-framing_present" toName="header" required="true" choice="single">
+  <Choice value="YES"/>
+  <Choice value="NO"/>
+</Choices>
+
+<Choices name="E1-misleading_header_model_final" toName="header" required="true" choice="single">
+  <Choice value="NOT_MISLEADING"/>
+  <Choice value="POTENTIALLY_MISLEADING"/>
+  <Choice value="MISLEADING"/>
+</Choices>
+```
+
+Schéma navíc pracuje i se skrytými metadaty ukládanými z CSV vstupu, například:
+- `id`
+- `source`
+- `pre-label`
+- `url`
+- `published`
 
 ### Split dat
 
@@ -200,7 +237,7 @@ Související notebooky:
 ## Struktura repozitáře
 
 ```text
-bp-misleading-cs/
+czech-misleading-headlines/
 ├── README.md
 ├── requirements.txt
 ├── annotation_guidelines/    # Anotační příručka
@@ -231,6 +268,7 @@ bp-misleading-cs/
 - Long prompt výsledky: `outputs/eval_outputs/full/`
 - Kombinované srovnání: `outputs/eval_outputs/combined/`
 
+<a id="reproduction"></a>
 ## Reprodukce
 
 ### Lokální příprava
@@ -253,6 +291,7 @@ python data/processed/dataset_split.py
 python data/iaa/iaa_evaluation.py
 ```
 
+<a id="training"></a>
 ### Fine-tuning
 
 Notebooky:
